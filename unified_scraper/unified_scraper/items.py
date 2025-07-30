@@ -6,7 +6,14 @@
 import scrapy
 
 
-class UnifiedScraperItem(scrapy.Item):
-    # define the fields for your item here like:
-    # name = scrapy.Field()
-    pass
+class PhhcCrawlerItem(scrapy.Item):
+    case_type = scrapy.Field()
+    date = scrapy.Field()
+    columns = scrapy.Field()  # Dictionary of column_name: value
+    links = scrapy.Field()    # List of URLs in the row
+
+
+class DelhiJudgmentItem(scrapy.Item):
+    case_no = scrapy.Field()
+    party = scrapy.Field()
+    pdf_link = scrapy.Field()
