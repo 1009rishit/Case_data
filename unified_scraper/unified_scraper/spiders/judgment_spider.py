@@ -2,6 +2,7 @@ import scrapy
 from bs4 import BeautifulSoup
 import re
 import math
+from datetime import datetime, timedelta
 
 class DelhiJudgmentsSpider(scrapy.Spider):
     name = "delhi_spider"
@@ -15,8 +16,9 @@ class DelhiJudgmentsSpider(scrapy.Spider):
 
         self.token = token
         self.captcha = captcha
-        self.from_date = "29-05-2025"
-        self.to_date = "29-07-2025"
+        today = datetime.today()
+        self.from_date = (today - timedelta(days=60)).strftime("%d-%m-%Y")
+        self.to_date = today.strftime("%d-%m-%Y")
 
         # First page POST
         yield scrapy.FormRequest(
