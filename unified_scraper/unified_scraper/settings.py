@@ -5,9 +5,9 @@ NEWSPIDER_MODULE = "unified_scraper.spiders"
 
 # GENERAL CRAWLING SETTINGS
 ROBOTSTXT_OBEY = False
-CONCURRENT_REQUESTS = 16
-CONCURRENT_REQUESTS_PER_DOMAIN = 4
-DOWNLOAD_DELAY = 0.25
+CONCURRENT_REQUESTS = 100
+CONCURRENT_REQUESTS_PER_DOMAIN = 50
+DOWNLOAD_DELAY = 0.1
 
 # HEADERS
 DEFAULT_REQUEST_HEADERS = {
@@ -37,13 +37,13 @@ ITEM_PIPELINES = {
 # }
 
 # FEEDS (Generic — override per spider at runtime if needed)
-FEEDS = {
-    'results.csv': {
-        'format': 'csv',
-        'encoding': 'utf8',
-        'overwrite': True,
-    }
-}
+# FEEDS = {
+#     'results.csv': {
+#         'format': 'csv',
+#         'encoding': 'utf8',
+#         'overwrite': True,
+#     }
+# }
 
 # LOGGING
 LOG_FILE = "crawl.log"
