@@ -4,10 +4,11 @@ import datetime
 import re,time,requests
 import base64
 import hashlib
+import os
 
 XEvil_CONFIG = {
     "baseUrl": "http://98.70.40.179/",
-    "key": "955b4891e3857aa717d2c8ce6b98d942",  
+    "key" : os.getenv("CAPTCHA_KEY"), 
     "initialDelay": 5,
     "interval": 5,
     "retries": 6
