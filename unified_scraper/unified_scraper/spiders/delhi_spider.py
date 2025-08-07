@@ -3,14 +3,18 @@ from bs4 import BeautifulSoup
 import re
 import math
 from datetime import datetime, timedelta
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class DelhiJudgmentsSpider(scrapy.Spider):
     name = "delhi_spider"
     allowed_domains = ["delhihighcourt.nic.in"]
-    start_urls = ["https://delhihighcourt.nic.in/app/judgement-dates-wise"]
+    start_urls = os.getenv("DELHI_START_URL")
 
     def parse(self, response):
-        # Extract CSRF token
+
         token = response.css('input[name="_token"]::attr(value)').get()
         captcha = response.css('span#captcha-code::text').get()
 
@@ -20,7 +24,7 @@ class DelhiJudgmentsSpider(scrapy.Spider):
         self.from_date = (today - timedelta(days=60)).strftime("%d-%m-%Y")
         self.to_date = today.strftime("%d-%m-%Y")
 
-        # First page POST
+      
         yield scrapy.FormRequest(
             url=self.start_urls[0],
             method="POST",
@@ -38,7 +42,7 @@ class DelhiJudgmentsSpider(scrapy.Spider):
 
     def parse_results(self, response):
         soup = BeautifulSoup(response.text, "html.parser")
-        rows = soup.select("#registrarsTableValue tr")[1:]  # skip header
+        rows = soup.select("#registrarsTableValue tr")[1:]  
 
         for row in rows:
             cols = row.find_all("td")
@@ -46,22 +50,36 @@ class DelhiJudgmentsSpider(scrapy.Spider):
                 continue
 
             case_no = cols[1].get_text(strip=True).replace('\xa0', ' ')
-            date_tag = cols[2].find("a", href=True)
-            date = date_tag.get_text(strip=True) if date_tag else ""
-            link = date_tag["href"] if date_tag else ""
-            if not link.startswith("http"):
-                link = response.urljoin(link)
-
             party = cols[3].get_text(strip=True).replace('\xa0', ' ')
+
+            # Extract all <a> tags in the 3rd column (date column)
+            links = cols[2].find_all("a", href=True)
+            pdf_link = ""
+            txt_link = ""
+            date = ""
+
+            for link_tag in links:
+                href = link_tag["href"]
+                text = link_tag.get_text(strip=True)
+
+                if not date:
+                    date = text
+
+                if href.lower().endswith(".pdf"):
+                    pdf_link = response.urljoin(href)
+                
+                elif href.lower().endswith(".txt"):
+                    txt_link = response.urljoin(href)
 
             yield {
                 "case_no": case_no,
                 "date": date,
                 "party": party,
-                "pdf_link": link
+                "pdf_link": pdf_link,
+                "txt_link": txt_link
             }
 
-        # ➕ Pagination logic
+      
         text = soup.find("div", string=re.compile("Showing"))
         if text:
             match = re.search(r"Showing \d+ to \d+ of (\d+)", text.get_text())

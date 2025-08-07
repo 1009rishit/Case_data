@@ -8,7 +8,7 @@ import requests
 
 XEvil_CONFIG = {
     "baseUrl": "http://98.70.40.179/",
-    "key": "anykey",  # Can be dummy, not used
+    "key": "anykey",  
     "initialDelay": 5,
     "interval": 5,
     "retries": 6
