@@ -9,8 +9,8 @@ import scrapy
 class PhhcCrawlerItem(scrapy.Item):
     case_type = scrapy.Field()
     date = scrapy.Field()
-    columns = scrapy.Field()  # Dictionary of column_name: value
-    links = scrapy.Field()    # List of URLs in the row
+    columns = scrapy.Field() 
+    links = scrapy.Field()    
 
 
 class DelhiJudgmentItem(scrapy.Item):
