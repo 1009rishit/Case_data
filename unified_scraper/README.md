@@ -61,7 +61,7 @@ Crawls case data from Punjab & Haryana High Court for the last 60 days
 
 Handles form submission, pagination, and case type filtering
 
-Exports to results.xlsx and results.csv
+Exports to haryana_result.csv
 scrapy crawl hppc_case_form_dynamic -o haryana_result.csv
 
 
@@ -73,16 +73,33 @@ Handles CSRF tokens, session cookies, and numeric CAPTCHAs
 Extracts case number, date, parties, and PDF/TXT download links
 scrapy crawl delhi_spider -o delhi_result.csv
 
+3. Link_to_pdf spider(general purpose spider)
 
-📤 Output
+Scrape all the link in the csv file just need to change the file path
+scrapy crawl general
 
-PHHC spiders:
 
-results.csv, results.xlsx (also you can export to anytype via -o phhc_result.json)
 
-Delhi HC spider:
+UTILS:-
 
-judgments.csv (you can also export JSON via -o judgments.json)
+1. captcha_resolver
+general class to automate the captcha
+
+2.pdf_downloader
+if any csv file that contains the pdf link then directly call the function to download all pdf if no captcha is there
+
+3.upload_to_azure
+file to upload the pdf to the azure database
+
+DATABASE
+create_db- to create the db
+high_court_database- to configure database
+models.py- to define table 
+insert_csv.py- to insert the csv file to the database
+
+how to run- 
+1. python create_b.py
+2. python insert_csv.py 
 
 ⚙️ Customization
 Date range / filtering:

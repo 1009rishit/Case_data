@@ -6,3 +6,5 @@ __pycache__/
 *.run.txt
 /2025/
 captcha_failed_response.html
+/alembic/
+*.ini

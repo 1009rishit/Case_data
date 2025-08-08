@@ -11,7 +11,7 @@ XEvil_CONFIG = {
 }
 
 class PHHCCaseSpider(scrapy.Spider):
-    name = "haryan_for"
+    name = "general"
     allowed_domains = ["phhc.gov.in"]
 
     custom_settings = {
@@ -29,8 +29,9 @@ class PHHCCaseSpider(scrapy.Spider):
 
     def start_requests(self):
         self.df = pd.read_csv('result_haryana.csv')
+        start_index = int(getattr(self, 'start_index', 0))
 
-        for index, url in enumerate(self.df['links']):
+        for index, url in enumerate(self.df['links'][start_index:], start=start_index):
             yield scrapy.Request(
                 url=url,
                 callback=self.solve_and_download_pdf,

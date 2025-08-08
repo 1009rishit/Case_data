@@ -8,3 +8,8 @@ requests
 hashlib
 base64
 logging
+
+sqlalchemy
+pymysql
+alembic
+pydantic
