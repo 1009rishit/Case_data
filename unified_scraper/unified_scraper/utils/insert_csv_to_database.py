@@ -125,9 +125,3 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
         session.close()
 
 
-if __name__ == "__main__":
-    insert_judgments_from_csv(
-        csv_path="delhi_result.csv",
-        high_court_name="Delhi High Court",
-        base_link="https://delhihighcourt.nic.in"
-    )

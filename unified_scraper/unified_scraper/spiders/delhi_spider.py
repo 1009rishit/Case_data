@@ -11,8 +11,11 @@ load_dotenv()
 class DelhiJudgmentsSpider(scrapy.Spider):
     name = "delhi_spider"
     allowed_domains = ["delhihighcourt.nic.in"]
-    start_urls = os.getenv("DELHI_START_URL")
-
+    start_url_str = os.getenv("DELHI_START_URL")  
+    if start_url_str:
+        start_urls = [start_url_str]  # wrap string in a list
+    else:
+        start_urls = []
     def parse(self, response):
 
         token = response.css('input[name="_token"]::attr(value)').get()
