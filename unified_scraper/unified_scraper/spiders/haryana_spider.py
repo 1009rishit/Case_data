@@ -86,8 +86,23 @@ class PHHCCaseSpider(scrapy.Spider):
             cells = row.css('td')
             columns = {}
             links = []
+            case_id=""
+            party_details=""
             for i, cell in enumerate(cells):
                 # Get text
+                case_href = cells[0].css('a::attr(href)').get(default='')
+                case_no   = cells[0].css('a b::text').get(default='').strip()  # RSA-4028-2016
+
+                # Extract actual case_id from the href
+                import urllib.parse as up
+                parsed_qs = up.parse_qs(up.urlparse(case_href).query)
+                case_id   = parsed_qs.get('case_id', [''])[0]
+
+                # Party details (assuming it's the 3rd <td>)
+                party_details = " ".join(
+                    text.strip() for text in cells[2].css('::text').getall() if text.strip()
+                )
+
                 text = cell.css('::text').get(default='').strip()
                 columns[headers[i] if i < len(headers) else f'col_{i}'] = text
                 # Extract only "View Order" links via onclick parsing
@@ -97,19 +112,17 @@ class PHHCCaseSpider(scrapy.Spider):
                     if m:
                         li=response.urljoin(m.group(1))
                         links.append(response.urljoin(m.group(1)))
-                        # yield scrapy.Request(
-                        #     url=li,
-                        #     callback=self.solve_and_download_pdf,
-                        #     cb_kwargs={'link': li},
-                        #     dont_filter=True
-                        #     )
+                        
             if not links:
                 continue
             item = PhhcCrawlerItem(
                 case_type=case_type,
                 date=day,
                 columns=columns,
+                case_id=case_id,
+                party_details=party_details,
                 links=links
+
             )
             yield item
 
@@ -125,130 +138,5 @@ class PHHCCaseSpider(scrapy.Spider):
                 dont_filter=True
             )
                    
-
-    # def solve_and_download_pdf(self, response, link):
-    #     import requests
-    #     from urllib.parse import urljoin
-    #     import os
-    #     import hashlib
-
-    #     # Step 1: Extract form action and CAPTCHA image
-    #     form_action = response.xpath('//form[@id="security_chaeck"]/@action').get()
-    #     captcha_src = response.css('img#captchaimg::attr(src)').get()
-
-    #     if not form_action or not captcha_src:
-    #         self.logger.error("Could not extract CAPTCHA form or image.")
-    #         return
-
-    #     full_post_url = response.urljoin(form_action)
-    #     captcha_url = response.urljoin(captcha_src)
-
-    #     # Step 2: Transfer cookies from Scrapy to requests.Session
-    #     session = requests.Session()
-    #     for name, value in response.request.cookies.items():
-    #         session.cookies.set(name, value)
-
-    #     headers = {
-    #         'User-Agent': 'Mozilla/5.0',
-    #         'Referer': response.url,
-    #         'Origin': 'https://www.phhc.gov.in',
-    #         'Content-Type': 'application/x-www-form-urlencoded',
-    #     }
-    #     session.headers.update(headers)
-
-    #     # Step 3: Download CAPTCHA image
-    #     try:
-    #         captcha_response = session.get(captcha_url)
-    #         captcha_bytes = captcha_response.content
-    #         with open('captcha.png', 'wb') as f:
-    #             f.write(captcha_response.content)
-    #         print("✅ CAPTCHA image saved as 'captcha.png'. Please open it and solve.")
-    #     except Exception as e:
-    #         self.logger.error(f"Failed to download CAPTCHA image: {e}")
-    #         return
-
-    #     # Step 4: Solve manually
-    #     captcha_text = self.solve_captcha_xevil(captcha_bytes)
-    #     if not captcha_text:
-    #         self.logger.error(f"CAPTCHA solving failed for {link}")
-    #         return
-
-    #     # Step 5: POST the form to get PDF
-    #     payload = {
-    #         'vercode': captcha_text,
-    #         'submit': 'Submit'
-    #     }
-
-    #     try:
-    #         post_response = session.post(full_post_url, data=payload, allow_redirects=True)
-    #     except Exception as e:
-    #         self.logger.error(f"POST request failed: {e}")
-    #         return
-
-    #     # Step 6: Check response and save PDF
-    #     content_type = post_response.headers.get("Content-Type", "")
-    #     if content_type.startswith("application/pdf"):
-    #         # Generate unique and safe filename using hash
-    #         auth_token = link.split('auth=')[-1]
-    #         filename_hash = hashlib.md5(auth_token.encode()).hexdigest()
-    #         filename = f"{filename_hash}.pdf"
-
-    #         folder = "2025/08/06/hppc"
-    #         os.makedirs(folder, exist_ok=True)
-    #         path = os.path.join(folder, filename)
-
-    #         with open(path, "wb") as f:
-    #             f.write(post_response.content)
-    #         self.logger.info(f"✅ PDF downloaded and saved to {path}")
-    #     else:
-    #         # Save HTML for debugging
-    #         debug_file = "captcha_failed_response.html"
-    #         with open(debug_file, "w", encoding="utf-8") as f:
-    #             f.write(post_response.text)
-    #         self.logger.warning(f"Failed to download PDF for {link}. CAPTCHA likely failed. See '{debug_file}'")
-                
-    # def solve_captcha_xevil(self, captcha_bytes):
-    #     try:
-    #         base64_image = base64.b64encode(captcha_bytes).decode('utf-8')
-    #         submit = requests.post(
-    #         XEvil_CONFIG["baseUrl"] + "in.php",
-    #         data={
-    #                 "key": XEvil_CONFIG["key"],
-    #                 "method": "base64",
-    #                 "body": base64_image
-    #             }
-    #         )
-    #         if "OK|" not in submit.text:
-    #             self.logger.warning("Failed to submit CAPTCHA to XEvil")
-    #             return
-
-    #         captcha_id = submit.text.split("|")[1]
-    #         time.sleep(XEvil_CONFIG["initialDelay"])
-
-    #         # Poll for solved CAPTCHA
-    #         captcha_text = None
-    #         for _ in range(XEvil_CONFIG["retries"]):
-    #             poll = requests.get(
-    #                 XEvil_CONFIG["baseUrl"] + "res.php",
-    #                 params={
-    #                         "key": XEvil_CONFIG["key"],
-    #                         "action": "get",
-    #                         "id": captcha_id
-    #                 }
-    #             )
-    #             if "OK|" in poll.text:
-    #                 captcha_text = poll.text.split("|")[1]
-    #                 print(f"\n{captcha_text}\n")
-    #                 return captcha_text
-    #             time.sleep(XEvil_CONFIG["interval"])
-
-    #         if not captcha_text:
-    #             self.logger.warning("CAPTCHA solving timed out.")
-    #             return
-
-    #     except Exception as e:
-    #             self.logger.error(f"CAPTCHA solving failed: {str(e)}")
-    #             return
-    
 
     

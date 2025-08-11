@@ -28,10 +28,23 @@ class PHHCCaseSpider(scrapy.Spider):
         self.last_success_row = -1
 
     def start_requests(self):
+        # Read crawl.log and get only successfully saved rows
+        processed_rows = set()
+        if os.path.exists('crawl11.log'):
+            with open('crawl.log', 'r', encoding='utf-8', errors='ignore') as log_file:
+                for line in log_file:
+                    match = re.search(r'✅ Row (\d+): PDF saved at', line)
+                    if match:
+                        processed_rows.add(int(match.group(1)))
+
         self.df = pd.read_csv('result_haryana.csv')
         start_index = int(getattr(self, 'start_index', 0))
 
         for index, url in enumerate(self.df['links'][start_index:], start=start_index):
+            if index in processed_rows:
+                self.logger.info(f"⏩ Skipping row {index} (already processed).")
+                continue
+
             yield scrapy.Request(
                 url=url,
                 callback=self.solve_and_download_pdf,

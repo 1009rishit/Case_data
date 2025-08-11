@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Date, Text, Boolean, ForeignKey, TIMESTAMP, UniqueConstraint
 from sqlalchemy.orm import relationship
-from database.high_court_database import Base
+from Database.high_court_database import Base
 from sqlalchemy.sql import func
 
 class HighCourt(Base):

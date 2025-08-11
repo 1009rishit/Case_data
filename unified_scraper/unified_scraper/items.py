@@ -10,7 +10,9 @@ class PhhcCrawlerItem(scrapy.Item):
     case_type = scrapy.Field()
     date = scrapy.Field()
     columns = scrapy.Field() 
-    links = scrapy.Field()    
+    links = scrapy.Field()   
+    case_id=scrapy.Field()
+    party_details=scrapy.Field() 
 
 
 class DelhiJudgmentItem(scrapy.Item):
