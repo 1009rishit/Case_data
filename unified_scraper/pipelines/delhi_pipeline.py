@@ -13,23 +13,23 @@ from unified_scraper.utils.insert_csv_to_database import insert_judgments_from_c
 from Database.high_court_database import SessionLocal
 from unified_scraper.utils.upload_to_azure import upload_to_azure
 
-def run_pdf_download(root_folder="2025"):
+def run_pdf_download(root_folder):
     session = SessionLocal()
     try:
         pdf_items = get_pending_pdfs(session)
         if not pdf_items:
             print("No pending PDFs to download.")
             return
-        downloaded_files = download_and_update(session, pdf_items)
+        downloaded_files = download_and_update(session, pdf_items,output_root_folder=root_folder)
         return downloaded_files
     finally:
         session.close()
 
 
-def run_upload(root_folder, downloaded_files):
+def run_upload(downloaded_files, root_folder):
     session = SessionLocal()
     try:
-        upload_to_azure(session, downloaded_files)
+        upload_to_azure(session, downloaded_files,local_base=root_folder)
     finally:
         session.close()
 
@@ -66,7 +66,7 @@ def main():
 
     downloaded_files = run_pdf_download(root_folder=root_folder)
     if downloaded_files:
-        run_upload(root_folder, downloaded_files)
+        run_upload(downloaded_files,root_folder=root_folder)
     else:
         print("No files downloaded, skipping upload.")
 

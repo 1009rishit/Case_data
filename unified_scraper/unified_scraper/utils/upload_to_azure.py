@@ -3,6 +3,8 @@ from azure.storage.blob import BlobServiceClient, ContentSettings
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from Database.models import MetaData
+import os
+import shutil
 
 load_dotenv()
 
@@ -14,10 +16,8 @@ account_url = sas_url.split('?')[0]
 sas_token = sas_url.split('?')[1]
 container_name = os.getenv('CONTAINER_NAME')
 
-# local_base is the root folder where PDFs and TXTs are stored
-local_base = "2025"
 
-def upload_to_azure(session: Session, downloaded_files):
+def upload_to_azure(session: Session, downloaded_files,local_base):
     """
     Uploads PDF and TXT files from downloaded_files list to Azure Blob Storage.
     Marks the DB record is_downloaded=True only after PDF upload success.
@@ -76,7 +76,15 @@ def upload_to_azure(session: Session, downloaded_files):
                         content_settings=ContentSettings(content_type="text/plain")
                     )
                 uploaded_count += 1
+                
             except Exception as e:
-                print(f"❌ Failed to upload TXT {txt_path}: {e}")
+                print(f"Failed to upload TXT {txt_path}: {e}")
 
-    print(f"\n✅ Uploaded {uploaded_count} file(s) (.pdf/.txt) to Azure Blob Storage.")
+    print(f"\nUploaded {uploaded_count} file(s) (.pdf/.txt) to Azure Blob Storage.")
+
+    if os.path.exists(local_base):
+        try:
+            shutil.rmtree(local_base)
+            print(f"Deleted local folder and all contents: {local_base}")
+        except Exception as e:
+                print(f"Failed to delete folder {local_base}: {e}")

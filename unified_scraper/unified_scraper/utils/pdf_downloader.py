@@ -50,7 +50,7 @@ def pdf_to_txt(pdf_path):
         print(f"Failed to convert {pdf_path} to TXT: {e}")
 
 
-def download_and_update(session: Session, pdf_items, output_root_folder="2025"):
+def download_and_update(session: Session, pdf_items, output_root_folder):
     today = datetime.today()
     month, day = today.strftime("%m"), today.strftime("%d")
 
