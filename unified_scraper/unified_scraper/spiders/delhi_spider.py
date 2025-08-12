@@ -16,6 +16,7 @@ class DelhiJudgmentsSpider(scrapy.Spider):
         start_urls = [start_url_str]  # wrap string in a list
     else:
         start_urls = []
+        
     def parse(self, response):
 
         token = response.css('input[name="_token"]::attr(value)').get()

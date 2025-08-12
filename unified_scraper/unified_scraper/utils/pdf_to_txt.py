@@ -1,19 +1,21 @@
-from pdf2image import convert_from_bytes
-import pytesseract
+from pathlib import Path
+import os
+import fitz
 
-def pdf_bytes_to_text(pdf_bytes):
+def pdf_to_txt(pdf_path):
     """
-    Convert PDF bytes to extracted text using OCR.
-    
-    :param pdf_bytes: PDF content in bytes
-    :return: Extracted text as a string
+    Convert a PDF file to TXT and save in the same directory.
     """
+    txt_path = os.path.splitext(pdf_path)[0] + ".txt"
     try:
-        extracted_text = ""
-        images = convert_from_bytes(pdf_bytes, dpi=300)
-        for img in images:
-            text = pytesseract.image_to_string(img)
-            extracted_text += text + "\n"
-        return extracted_text
+        with fitz.open(pdf_path) as pdf_doc:
+            text_content = ""
+            for page in pdf_doc:
+                text_content += page.get_text()
+
+        with open(txt_path, "w", encoding="utf-8") as txt_file:
+            txt_file.write(text_content)
+
+        print(f"TXT saved: {txt_path}")
     except Exception as e:
-        return f"[OCR FAILED] {e}"
+        print(f" Failed to convert {pdf_path} to TXT: {e}")

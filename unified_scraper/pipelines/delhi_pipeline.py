@@ -8,8 +8,30 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
-from unified_scraper.utils.pdf_downloader import download_pdfs_from_csv
+from unified_scraper.utils.pdf_downloader import get_pending_pdfs, download_and_update
 from unified_scraper.utils.insert_csv_to_database import insert_judgments_from_csv
+from Database.high_court_database import SessionLocal
+from unified_scraper.utils.upload_to_azure import upload_to_azure
+
+def run_pdf_download(root_folder="2025"):
+    session = SessionLocal()
+    try:
+        pdf_items = get_pending_pdfs(session)
+        if not pdf_items:
+            print("No pending PDFs to download.")
+            return
+        downloaded_files = download_and_update(session, pdf_items)
+        return downloaded_files
+    finally:
+        session.close()
+
+
+def run_upload(root_folder, downloaded_files):
+    session = SessionLocal()
+    try:
+        upload_to_azure(session, downloaded_files)
+    finally:
+        session.close()
 
 
 def run_spider(spider_name, output_csv):
@@ -32,11 +54,6 @@ def main():
 
     run_spider("delhi_spider", output_csv)
 
-    print("\nDownloading PDFs...")
-    download_pdfs_from_csv(output_csv, output_root_folder="2025")
-    print("PDF download step completed.")
-
-    # STEP 3: Insert into DB
     print("\n Inserting records into database...")
     insert_judgments_from_csv(
         csv_path=output_csv,
@@ -45,6 +62,13 @@ def main():
     )
     print("Database insertion completed.")
 
+    root_folder = datetime.today().strftime("%Y")
+
+    downloaded_files = run_pdf_download(root_folder=root_folder)
+    if downloaded_files:
+        run_upload(root_folder, downloaded_files)
+    else:
+        print("No files downloaded, skipping upload.")
 
 
 if __name__ == "__main__":

@@ -70,7 +70,8 @@ class PHHCCaseSpider(scrapy.Spider):
                 )
 
     def save_response(self, response, case_type, day):
-        from ..items import PhhcCrawlerItem
+        import urllib.parse as up
+        # from ..items import PhhcCrawlerItem
 
         # Log if 'refine your query' appears in the response
         if b'refine your query' in response.body.lower():
@@ -78,7 +79,7 @@ class PHHCCaseSpider(scrapy.Spider):
 
         table = response.css('table#tables11')
         headers = table.css('tr th::text').getall()
-        rows = table.css('tr')[1:]  # skip header row
+        rows = table.css('tr')[1:]
 
         if not rows:
             return
@@ -86,26 +87,14 @@ class PHHCCaseSpider(scrapy.Spider):
             cells = row.css('td')
             columns = {}
             links = []
-            case_id=""
-            party_details=""
+            case_id = ''
+            party_details = ''
             for i, cell in enumerate(cells):
-                # Get text
-                case_href = cells[0].css('a::attr(href)').get(default='')
-                case_no   = cells[0].css('a b::text').get(default='').strip()  # RSA-4028-2016
-
-                # Extract actual case_id from the href
-                import urllib.parse as up
-                parsed_qs = up.parse_qs(up.urlparse(case_href).query)
-                case_id   = parsed_qs.get('case_id', [''])[0]
-
-                # Party details (assuming it's the 3rd <td>)
-                party_details = " ".join(
-                    text.strip() for text in cells[2].css('::text').getall() if text.strip()
-                )
 
                 text = cell.css('::text').get(default='').strip()
                 columns[headers[i] if i < len(headers) else f'col_{i}'] = text
-                # Extract only "View Order" links via onclick parsing
+                
+
                 for a in cell.xpath('.//a[text()="View Order"]'):
                     onclick = a.attrib.get('OnClick') or a.attrib.get('onclick', '')
                     m = re.search(r"window\.open\('([^']+)'\)", onclick)
@@ -115,16 +104,34 @@ class PHHCCaseSpider(scrapy.Spider):
                         
             if not links:
                 continue
-            item = PhhcCrawlerItem(
-                case_type=case_type,
-                date=day,
-                columns=columns,
-                case_id=case_id,
-                party_details=party_details,
-                links=links
 
-            )
-            yield item
+            if len(cells) > 1:
+                # Extract encoded case_id from href
+                href = cells[1].css('a::attr(href)').get(default='')
+                if href:
+                    import urllib.parse as up
+                    parsed_qs = up.parse_qs(up.urlparse(href).query)
+                    encoded_case_id = parsed_qs.get('case_id', [''])[0]
+
+                # Extract displayed case number
+                case_no = cells[1].css('a b::text').get(default='').strip()
+
+                # Extract party details
+                party_details = cells[2].css('::text').get(default='').strip()
+            yield{
+                # case_type=case_type,
+                # date=day,
+                # columns=columns,
+                # case_id=case_id,
+                # party_details=party_details,
+                # links=links
+                'date':day,
+                'party_details':party_details,
+                'case_id':case_no,
+                'links':links
+
+            }
+            #yield item
 
             
 
