@@ -32,7 +32,7 @@ class XevilCaptchaSolver:
                 }
             )
             if "OK|" not in submit.text:
-                self.logger.warning("❌ Failed to submit CAPTCHA to XEvil")
+                self.logger.warning(" Failed to submit CAPTCHA to XEvil")
                 return None
 
             captcha_id = submit.text.split("|")[1]
@@ -53,9 +53,9 @@ class XevilCaptchaSolver:
                     return captcha_text
                 time.sleep(self.config["interval"])
 
-            self.logger.warning("⌛ CAPTCHA solving timed out.")
+            self.logger.warning("CAPTCHA solving timed out.")
             return None
 
         except Exception as e:
-            self.logger.error(f"❌ CAPTCHA solving failed: {str(e)}")
+            self.logger.error(f" CAPTCHA solving failed: {str(e)}")
             return None

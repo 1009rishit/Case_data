@@ -7,15 +7,15 @@ from Database.high_court_database import SessionLocal
 import os
 
 
-def clean_date(raw_date: str):
-    """Parse and clean date strings like '01-01-2025 (pdf)' -> datetime.date"""
-    if pd.isna(raw_date) or not str(raw_date).strip():
-        return None
-    try:
-        cleaned = str(raw_date).replace("(pdf)", "").strip().split()[0]
-        return datetime.strptime(cleaned, '%d-%m-%Y').date()
-    except ValueError:
-        return None
+# def clean_date(raw_date: str):
+#     """Parse and clean date strings like '01-01-2025 (pdf)' -> datetime.date"""
+#     if pd.isna(raw_date) or not str(raw_date).strip():
+#         return None
+#     try:
+#         cleaned = str(raw_date).replace("(pdf)", "").strip().split()[0]
+#         return datetime.strptime(cleaned, '%d-%m-%Y').date()
+#     except ValueError:
+#         return None
 
 
 def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: str):
@@ -47,9 +47,9 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
         if not highcourt:
             highcourt = HighCourt(highcourt_name=high_court_name, base_link=base_link)
             session.add(highcourt)
-            # session.commit()
-            # session.refresh(highcourt)
-            # print(f"Added new High Court: {high_court_name}")
+            session.commit()
+            session.refresh(highcourt)
+            print(f"Added new High Court: {high_court_name}")
 
         existing_records = {
             (cid, dlink)
@@ -58,28 +58,31 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
             .all()
         }
         existing_case_ids = {cid for cid, _ in existing_records}
-
+        print(existing_records)
         insert_count = 0
         skip_count = 0
 
         for idx, row in df.iterrows():
             case_id = str(row['case_no']).strip() if pd.notna(row['case_no']) else None
             raw_date = str(row['date']).strip() if pd.notna(row['date']) else None
+            date_obj = datetime.strptime(raw_date, "%d-%m-%Y").date()
             party_detail = str(row['party']).strip() if pd.notna(row['party']) else None
             document_link = str(row['pdf_link']).strip() if pd.notna(row['pdf_link']) else None
 
-            if not all([case_id, raw_date, party_detail, document_link]):
+            if not all([case_id, date_obj, party_detail, document_link]):
                 print(f"Row {idx} skipped: Missing fields.")
                 skip_count += 1
                 continue
-
-            judgement_date = clean_date(raw_date)
-            if not judgement_date:
-                print(f" Row {idx} skipped: Invalid date '{raw_date}'.")
+            
+            #judgement_date = clean_date(raw_date)
+            if not date_obj:
+                print(f" Row {idx} skipped: Invalid date '{date_obj}'.")
                 skip_count += 1
                 continue
 
             if (case_id, document_link) in existing_records:
+                print((case_id, document_link))
+                
                 print(f"Row {idx} skipped: Duplicate case_id '{case_id}' with same document_link.")
                 skip_count += 1
                 continue
@@ -90,7 +93,7 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
             metadata = MetaData(
                 high_court_id=highcourt.id,
                 case_id=case_id,
-                judgement_date=judgement_date,
+                judgement_date=date_obj,
                 party_detail=party_detail,
                 document_link=document_link,
                 scrapped_at=datetime.now(),

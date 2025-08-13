@@ -4,7 +4,7 @@ import requests
 import fitz 
 from datetime import datetime
 from sqlalchemy.orm import Session
-from Database.models import MetaData 
+from Database.models import MetaData,HighCourt
 
 
 def sanitize_filename(name: str) -> str:
@@ -12,16 +12,28 @@ def sanitize_filename(name: str) -> str:
     return re.sub(r'[\\/*?:"<>|]', '_', name)
 
 
-def get_pending_pdfs(session: Session):
+def get_pending_pdfs(session: Session, high_court_name: str):
     """
-    Retrieve all rows where is_downloaded = False from MetaData table.
-    Returns list of dicts with document_link and case_id.
+    Retrieve all rows where is_downloaded = False from MetaData table
+    AND the high_court_id matches the high_court_name provided.
+    Returns list of dicts with document_link, case_id, and id.
     """
+    
+    court = session.query(HighCourt).filter(
+        HighCourt.highcourt_name == high_court_name
+    ).first()
+
+    if not court:
+        return []  
     pending = (
         session.query(MetaData)
-        .filter(MetaData.is_downloaded == False)
+        .filter(
+            MetaData.is_downloaded == False,
+            MetaData.high_court_id == court.id  
+        )
         .all()
     )
+
     return [
         {
             "document_link": row.document_link,

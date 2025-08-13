@@ -31,7 +31,7 @@ class PHHCCaseSpider(scrapy.Spider):
 
     def date_range_last_two_months(self):
         today = datetime.datetime.today()  # Use fixed current time for reproducibility
-        two_months_ago = today - datetime.timedelta(days=60)
+        two_months_ago = today - datetime.timedelta(days=1)
         for n in range((today - two_months_ago).days):
             day = two_months_ago + datetime.timedelta(days=n)
             yield day.strftime('%d/%m/%Y')
@@ -65,15 +65,13 @@ class PHHCCaseSpider(scrapy.Spider):
                     url=self.start_url,
                     formdata=formdata,
                     callback=self.save_response,
-                    cb_kwargs={'case_type': case_type, 'day': day},
+                    cb_kwargs={'case_type': case_type, 'day': day.replace("/", "-")},
                     dont_filter=True
                 )
 
     def save_response(self, response, case_type, day):
         import urllib.parse as up
-        # from ..items import PhhcCrawlerItem
 
-        # Log if 'refine your query' appears in the response
         if b'refine your query' in response.body.lower():
             self.logger.warning(f"'Refine your query' found for case_type={case_type}, date={day}, url={response.url}")
 
@@ -86,9 +84,8 @@ class PHHCCaseSpider(scrapy.Spider):
         for row in rows:
             cells = row.css('td')
             columns = {}
-            links = []
-            case_id = ''
-            party_details = ''
+            pdf_link = []
+            party = ''
             for i, cell in enumerate(cells):
 
                 text = cell.css('::text').get(default='').strip()
@@ -100,42 +97,35 @@ class PHHCCaseSpider(scrapy.Spider):
                     m = re.search(r"window\.open\('([^']+)'\)", onclick)
                     if m:
                         li=response.urljoin(m.group(1))
-                        links.append(response.urljoin(m.group(1)))
+                        pdf_link.append(response.urljoin(m.group(1)))
                         
-            if not links:
+            if not pdf_link:
                 continue
 
             if len(cells) > 1:
-                # Extract encoded case_id from href
+               
                 href = cells[1].css('a::attr(href)').get(default='')
                 if href:
                     import urllib.parse as up
                     parsed_qs = up.parse_qs(up.urlparse(href).query)
                     encoded_case_id = parsed_qs.get('case_id', [''])[0]
 
-                # Extract displayed case number
+                
                 case_no = cells[1].css('a b::text').get(default='').strip()
 
-                # Extract party details
-                party_details = cells[2].css('::text').get(default='').strip()
+                
+                party = cells[2].css('::text').get(default='').strip()
+                
             yield{
-                # case_type=case_type,
-                # date=day,
-                # columns=columns,
-                # case_id=case_id,
-                # party_details=party_details,
-                # links=links
+                
                 'date':day,
-                'party_details':party_details,
-                'case_id':case_no,
-                'links':links
+                'party':party,
+                'case_no':case_no,
+                'pdf_link':pdf_link
 
             }
-            #yield item
-
             
 
-        #Pagination: look for a 'Next' button or link
         next_page = response.css('a:contains("Next")::attr(href), a[title="Next"]::attr(href)').get()
         if next_page:
             yield response.follow(
@@ -144,6 +134,4 @@ class PHHCCaseSpider(scrapy.Spider):
                 cb_kwargs={'case_type': case_type, 'day': day},
                 dont_filter=True
             )
-                   
-
     

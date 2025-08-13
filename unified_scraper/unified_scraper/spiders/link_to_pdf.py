@@ -1,6 +1,8 @@
 import re, time, requests, base64, hashlib, os, scrapy, datetime, pandas as pd
 from pdf2image import convert_from_bytes
 import pytesseract
+from Database.high_court_database import SessionLocal
+from unified_scraper.utils.pdf_downloader import get_pending_pdfs
 
 XEvil_CONFIG = {
     "baseUrl": "http://98.70.40.179/",
@@ -9,7 +11,7 @@ XEvil_CONFIG = {
     "interval": 5,
     "retries": 6
 }
-
+SUCCESSFUL_PDFS = [] 
 class PHHCCaseSpider(scrapy.Spider):
     name = "general"
     allowed_domains = ["phhc.gov.in"]
@@ -28,32 +30,33 @@ class PHHCCaseSpider(scrapy.Spider):
         self.last_success_row = -1
 
     def start_requests(self):
-        # Read crawl.log and get only successfully saved rows
-        # processed_rows = set()
-        # if os.path.exists('crawl11.log'):
-        #     with open('crawl.log', 'r', encoding='utf-8', errors='ignore') as log_file:
-        #         for line in log_file:
-        #             match = re.search(r'✅ Row (\d+): PDF saved at', line)
-        #             if match:
-        #                 processed_rows.add(int(match.group(1)))
+        session = SessionLocal()
 
-        self.df = pd.read_csv('result_haryana.csv')
-        start_index = int(getattr(self, 'start_index', 0))
+        try:
+            
+            pending_pdfs = get_pending_pdfs(session, high_court_name="Punjab&Haryana High Court")
+            
+            start_index = int(getattr(self, 'start_index', 0))
 
-        for index, url in enumerate(self.df['links'][start_index:], start=start_index):
-            # if index in processed_rows:
-            #     self.logger.info(f"⏩ Skipping row {index} (already processed).")
-            #     continue
+            for index, record in enumerate(pending_pdfs[start_index:], start=start_index):
+                
+                yield scrapy.Request(
+                    url=record["document_link"],  
+                    callback=self.solve_and_download_pdf,
+                    cb_kwargs={
+                        "link": record["document_link"],
+                        "row_index": index,
+                        "case_id": record["case_id"],
+                        "db_id": record["id"] 
+                    },
+                    dont_filter=True
+                )
+        finally:
+            session.close()
 
-            yield scrapy.Request(
-                url=url,
-                callback=self.solve_and_download_pdf,
-                cb_kwargs={'link': url, 'row_index': index},
-                dont_filter=True
-            )
-
-    def solve_and_download_pdf(self, response, link, row_index):
+    def solve_and_download_pdf(self, response, link, row_index,case_id,db_id):
         from urllib.parse import urljoin
+        print("downloading start")
 
         form_action = response.xpath('//form[@id="security_chaeck"]/@action').get()
         captcha_src = response.css('img#captchaimg::attr(src)').get()
@@ -83,12 +86,12 @@ class PHHCCaseSpider(scrapy.Spider):
         except Exception as e:
             self.logger.error(f"[Row {row_index}] Failed to download CAPTCHA image: {e}")
             return
-
+        print("hiiiiii")
         captcha_text = self.solve_captcha_xevil(captcha_bytes)
         if not captcha_text:
             self.logger.error(f"[Row {row_index}] CAPTCHA solving failed for {link}")
             return
-
+        print(f"captcha_text{captcha_text}")
         payload = {'vercode': captcha_text, 'submit': 'Submit'}
 
         try:
@@ -103,6 +106,12 @@ class PHHCCaseSpider(scrapy.Spider):
             self.save_pdf_and_txt(post_response.content, auth_token, row_index)
             self.downloaded_count += 1
             self.last_success_row = max(self.last_success_row, row_index)
+            SUCCESSFUL_PDFS.append({
+                "document_link": link,
+                "case_id": case_id,
+                "id": db_id
+            })
+
         else:
             debug_file = "captcha_failed_response.html"
             with open(debug_file, "w", encoding="utf-8") as f:
@@ -138,7 +147,7 @@ class PHHCCaseSpider(scrapy.Spider):
                 )
                 if "OK|" in poll.text:
                     captcha_text = poll.text.split("|")[1]
-                    self.logger.info(f"✅ CAPTCHA Solved: {captcha_text}")
+                    self.logger.info(f" CAPTCHA Solved: {captcha_text}")
                     return captcha_text
                 time.sleep(XEvil_CONFIG["interval"])
 
@@ -187,12 +196,12 @@ class PHHCCaseSpider(scrapy.Spider):
             with open(txt_path, 'w', encoding='utf-8') as f:
                 f.write(extracted_text)
 
-            self.logger.info(f"✅ Row {row_index}: PDF saved at {pdf_path}")
-            self.logger.info(f"📝 Row {row_index}: TXT saved at {txt_path}")
+            self.logger.info(f" Row {row_index}: PDF saved at {pdf_path}")
+            self.logger.info(f" Row {row_index}: TXT saved at {txt_path}")
 
         except Exception as e:
             self.logger.error(f"[Row {row_index}] Failed during PDF/TXT save: {e}")
     def closed(self, reason):
-        self.logger.info("\n📄 Crawl completed.")
-        self.logger.info(f"✅ Total PDFs downloaded: {self.downloaded_count}")
-        self.logger.info(f"📌 Last successfully downloaded row index: {self.last_success_row}")
+        self.logger.info("\n Crawl completed.")
+        self.logger.info(f" Total PDFs downloaded: {self.downloaded_count}")
+        self.logger.info(f" Last successfully downloaded row index: {self.last_success_row}")

@@ -5,9 +5,20 @@ import math
 from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
+import pandas as pd
 
 load_dotenv()
 
+def clean_date(raw_date: str):
+    """Parse and clean date strings like '01-01-2025 (pdf)' -> datetime.date"""
+    if pd.isna(raw_date) or not str(raw_date).strip():
+        return None
+    try:
+        cleaned = str(raw_date).replace("(pdf)", "").strip().split()[0]
+        return datetime.strptime(cleaned, '%d-%m-%Y').date()
+    except ValueError:
+        return None
+    
 class DelhiJudgmentsSpider(scrapy.Spider):
     name = "delhi_spider"
     allowed_domains = ["delhihighcourt.nic.in"]
@@ -77,7 +88,7 @@ class DelhiJudgmentsSpider(scrapy.Spider):
 
             yield {
                 "case_no": case_no,
-                "date": date,
+                "date": clean_date(date),
                 "party": party,
                 "pdf_link": pdf_link,
                 "txt_link": txt_link

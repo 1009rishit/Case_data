@@ -35,7 +35,7 @@ def upload_to_azure(session: Session, downloaded_files,local_base):
     for item in downloaded_files:
         pdf_path = item["pdf_path"]
         if not os.path.exists(pdf_path):
-            print(f"❌ PDF file not found: {pdf_path}, skipping.")
+            print(f" PDF file not found: {pdf_path}, skipping.")
             continue
 
         # Upload PDF
@@ -57,7 +57,7 @@ def upload_to_azure(session: Session, downloaded_files,local_base):
             session.query(MetaData).filter(MetaData.id == item["id"]).update({"is_downloaded": True})
             session.commit()
         except Exception as e:
-            print(f"❌ Failed to upload PDF {pdf_path}: {e}")
+            print(f" Failed to upload PDF {pdf_path}: {e}")
             continue
 
         # Upload TXT if exists
@@ -66,7 +66,7 @@ def upload_to_azure(session: Session, downloaded_files,local_base):
             relative_txt_path = os.path.relpath(txt_path, start=local_base).replace("\\", "/")
             blob_txt_path = f"{local_base}/{relative_txt_path}"
 
-            print(f"📤 Uploading TXT: {blob_txt_path}")
+            print(f" Uploading TXT: {blob_txt_path}")
             try:
                 with open(txt_path, "rb") as data:
                     container_client.upload_blob(
