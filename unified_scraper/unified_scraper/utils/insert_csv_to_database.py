@@ -40,10 +40,13 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
     print(f" Loaded {len(df)} rows from '{csv_path}'")
 
     session: Session = SessionLocal()
-
+    
+    existing_case_ids = set()
     try:
         # Ensure High Court exists
         highcourt = session.query(HighCourt).filter_by(highcourt_name=high_court_name).first()
+        
+        existing_records: dict[str, list] = {}
         if not highcourt:
             highcourt = HighCourt(highcourt_name=high_court_name, base_link=base_link)
             session.add(highcourt)
@@ -51,14 +54,18 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
             session.refresh(highcourt)
             print(f"Added new High Court: {high_court_name}")
 
-        existing_records = {
-            (cid, dlink)
-            for cid, dlink in session.query(MetaData.case_id, MetaData.document_link)
-            .filter_by(high_court_id=highcourt.id)
-            .all()
-        }
-        existing_case_ids = {cid for cid, _ in existing_records}
-        print(existing_records)
+            rows: list[MetaData] = (
+                session.query(MetaData.case_id, MetaData.document_link)
+                .filter_by(high_court_id=highcourt.id)
+                .all()
+            )
+            existing_records: dict[str, list] = { row.case_id: row.document_link for row in rows}
+            
+                
+
+            
+            existing_case_ids = set(existing_records.keys())
+            print(existing_records)
         insert_count = 0
         skip_count = 0
 
@@ -80,15 +87,15 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
                 skip_count += 1
                 continue
 
-            if (case_id, document_link) in existing_records:
-                print((case_id, document_link))
-                
+            if case_id in existing_records and document_link in existing_records[case_id]:
                 print(f"Row {idx} skipped: Duplicate case_id '{case_id}' with same document_link.")
                 skip_count += 1
                 continue
 
-            if case_id in existing_case_ids:
-                print(f" Case ID '{case_id}' exists with a different document_link — inserting anyway.")
+            if case_id in existing_records:
+                print(f"Case ID '{case_id}' exists with a different document_link — inserting anyway.")
+                existing_records[case_id].append(document_link)
+                insert_count += 1
 
             metadata = MetaData(
                 high_court_id=highcourt.id,
@@ -97,11 +104,11 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
                 party_detail=party_detail,
                 document_link=document_link,
                 scrapped_at=datetime.now(),
-                is_downloaded=False
+                is_downloaded=True
             )
             session.add(metadata)
 
-            existing_records.add((case_id, document_link))
+            existing_records[case_id]=  document_link
             existing_case_ids.add(case_id)
             insert_count += 1
 

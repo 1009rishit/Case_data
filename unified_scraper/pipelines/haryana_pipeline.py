@@ -62,9 +62,9 @@ def main():
     root_folder = datetime.today().strftime("%Y")
     
     if SUCCESSFUL_PDFS:
-    #     run_upload(SUCCESSFUL_PDFS,root_folder=root_folder)
-    # else:
-    #     print("No files downloaded, skipping upload.")
+        run_upload(SUCCESSFUL_PDFS,root_folder=root_folder)
+    else:
+        print("No files downloaded, skipping upload.")
         print(SUCCESSFUL_PDFS)
 
 

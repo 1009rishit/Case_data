@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Date, Text, Boolean, ForeignKey,
 from sqlalchemy.orm import relationship
 from Database.high_court_database import Base
 from sqlalchemy.sql import func
+from sqlalchemy import JSON 
 
 class HighCourt(Base):
     __tablename__ = "HighCourts"
@@ -21,7 +22,7 @@ class MetaData(Base):
     case_id = Column(String(255), nullable=False)
     judgement_date = Column(Date)
     party_detail = Column(Text)
-    document_link = Column(Text)
+    document_link = Column(JSON, nullable=True)
     is_downloaded = Column(Boolean, default=False)
     scrapped_at = Column(TIMESTAMP, server_default=func.now())
 

@@ -86,7 +86,7 @@ class PHHCCaseSpider(scrapy.Spider):
         except Exception as e:
             self.logger.error(f"[Row {row_index}] Failed to download CAPTCHA image: {e}")
             return
-        print("hiiiiii")
+        
         captcha_text = self.solve_captcha_xevil(captcha_bytes)
         if not captcha_text:
             self.logger.error(f"[Row {row_index}] CAPTCHA solving failed for {link}")
