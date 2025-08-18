@@ -60,9 +60,7 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
             .all()
         )
         existing_records: dict[str, list] = { row.case_id: row.document_link for row in rows}
-        print("hello")
         existing_case_ids = set(existing_records.keys())
-        print(existing_records)
         insert_count = 0
         skip_count = 0
 
@@ -120,7 +118,7 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
                 case_id=case_id,
                 judgement_date=raw_date,
                 party_detail=party_detail,
-                document_link=document_link,
+                document_link=json.dump(document_link),
                 scrapped_at=datetime.now(),
                 is_downloaded=False
             )
