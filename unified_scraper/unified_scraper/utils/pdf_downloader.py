@@ -17,13 +17,13 @@ def parse_links(raw):
         return []
     try:
         links = json.loads(raw)
-        if isinstance(links, str):  # JSON string, not list
+        if isinstance(links, str):  
             return [links]
         if isinstance(links, list):
             return links
         return []
     except Exception:
-        # If it's not JSON, just treat it as a single link
+        
         return [raw.strip()]
 
 def get_pending_pdfs(session: Session, high_court_name: str):
@@ -35,8 +35,7 @@ def get_pending_pdfs(session: Session, high_court_name: str):
     highcourt = session.query(HighCourt).filter_by(highcourt_name=high_court_name).first()
     if not highcourt:
         return []
-    print("High Court:", high_court_name, "->", highcourt)
-    print("HighCourt ID:", highcourt.id if highcourt else None) 
+ 
     pending = (
         session.query(MetaData)
         .filter(
@@ -45,7 +44,6 @@ def get_pending_pdfs(session: Session, high_court_name: str):
         )
         .all()
     ) 
-    print(f"hello{pending}")
 
     results = []
     for row in pending:
@@ -56,7 +54,6 @@ def get_pending_pdfs(session: Session, high_court_name: str):
                 "case_id": row.case_id,
                 "id": row.id
             })
-    print(results)
     return results
 
 

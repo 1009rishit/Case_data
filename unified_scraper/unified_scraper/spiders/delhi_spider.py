@@ -36,7 +36,7 @@ class DelhiJudgmentsSpider(scrapy.Spider):
         self.token = token
         self.captcha = captcha
         today = datetime.today()
-        self.from_date = (today - timedelta(days=70)).strftime("%d-%m-%Y")
+        self.from_date = (today - timedelta(days=5)).strftime("%d-%m-%Y")
         self.to_date = today.strftime("%d-%m-%Y")
 
       

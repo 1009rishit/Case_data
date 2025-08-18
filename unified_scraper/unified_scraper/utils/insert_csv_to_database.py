@@ -7,15 +7,6 @@ from Database.high_court_database import SessionLocal
 import os
 import json
 
-# def clean_date(raw_date: str):
-#     """Parse and clean date strings like '01-01-2025 (pdf)' -> datetime.date"""
-#     if pd.isna(raw_date) or not str(raw_date).strip():
-#         return None
-#     try:
-#         cleaned = str(raw_date).replace("(pdf)", "").strip().split()[0]
-#         return datetime.strptime(cleaned, '%d-%m-%Y').date()
-#     except ValueError:
-#         return None
 
 
 def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: str):
@@ -59,7 +50,18 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
             .filter_by(high_court_id=highcourt.id)
             .all()
         )
-        existing_records: dict[str, list] = { row.case_id: row.document_link for row in rows}
+        existing_records: dict[str, list] = {}
+        for row in rows:
+            val = row.document_link
+            if isinstance(val, str):
+                try:
+                    existing_records[row.case_id] = json.loads(val)
+                except Exception:
+                    existing_records[row.case_id] = []
+            elif isinstance(val, list):
+                existing_records[row.case_id] = val
+            else:
+                existing_records[row.case_id] = []
         existing_case_ids = set(existing_records.keys())
         insert_count = 0
         skip_count = 0
@@ -89,7 +91,7 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
 
             if case_id in existing_records:
                 print(f"Case ID '{case_id}' exists with a different document_link — inserting anyway.")
-                existing_records[case_id].append(document_link)
+                existing_records[case_id] = [document_link]
                 insert_count += 1
 
             existing = session.query(MetaData).filter_by(
@@ -103,11 +105,14 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
                 except Exception:
                     links = []
 
-                if document_link not in links:
-                    links.append(document_link)
-                    existing.document_link = json.dumps(links)
-                    existing.scrapped_at = datetime.now()
-                    insert_count += 1
+                if existing.document_link:
+                    if isinstance(existing.document_link, str):
+                        try:
+                            links = json.loads(existing.document_link)
+                        except Exception:
+                            links = []
+                    elif isinstance(existing.document_link, list):
+                        links = existing.document_link
                 else:
                     print(f"Row {idx} skipped: Same document_link already present in JSON.")
                     skip_count += 1
@@ -118,7 +123,7 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
                 case_id=case_id,
                 judgement_date=raw_date,
                 party_detail=party_detail,
-                document_link=json.dump(document_link),
+                document_link=json.dumps([document_link]),
                 scrapped_at=datetime.now(),
                 is_downloaded=False
             )
