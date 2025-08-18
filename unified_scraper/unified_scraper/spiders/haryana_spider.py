@@ -31,7 +31,7 @@ class PHHCCaseSpider(scrapy.Spider):
 
     def date_range_last_two_months(self):
         today = datetime.datetime.today()  # Use fixed current time for reproducibility
-        two_months_ago = today - datetime.timedelta(days=1)
+        two_months_ago = today - datetime.timedelta(days=60)
         for n in range((today - two_months_ago).days):
             day = two_months_ago + datetime.timedelta(days=n)
             yield day.strftime('%d/%m/%Y')
@@ -70,8 +70,10 @@ class PHHCCaseSpider(scrapy.Spider):
                 )
 
     def save_response(self, response, case_type, day):
+        from datetime import datetime
         import urllib.parse as up
-
+        date_obj = datetime.strptime(day, "%d-%m-%Y")
+        new_date = date_obj.strftime("%Y-%m-%d")
         if b'refine your query' in response.body.lower():
             self.logger.warning(f"'Refine your query' found for case_type={case_type}, date={day}, url={response.url}")
 
@@ -118,7 +120,7 @@ class PHHCCaseSpider(scrapy.Spider):
                 
             yield{
                 
-                'date':day,
+                'date':new_date,
                 'party':party,
                 'case_no':case_no,
                 'pdf_link':pdf_link
