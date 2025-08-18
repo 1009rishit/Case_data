@@ -1,7 +1,7 @@
 __pycache__/
 *.log
 *.csv
-*.xlxs
+*.xlsx
 *.env
 *.run.txt
 /2025/

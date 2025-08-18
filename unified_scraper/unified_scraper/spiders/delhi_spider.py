@@ -36,7 +36,7 @@ class DelhiJudgmentsSpider(scrapy.Spider):
         self.token = token
         self.captcha = captcha
         today = datetime.today()
-        self.from_date = (today - timedelta(days=60)).strftime("%d-%m-%Y")
+        self.from_date = (today - timedelta(days=70)).strftime("%d-%m-%Y")
         self.to_date = today.strftime("%d-%m-%Y")
 
       
@@ -76,7 +76,8 @@ class DelhiJudgmentsSpider(scrapy.Spider):
             for link_tag in links:
                 href = link_tag["href"]
                 text = link_tag.get_text(strip=True)
-
+                if date:
+                    date=clean_date(date)
                 if not date:
                     date = text
 
@@ -88,7 +89,7 @@ class DelhiJudgmentsSpider(scrapy.Spider):
 
             yield {
                 "case_no": case_no,
-                "date": clean_date(date),
+                "date": date,
                 "party": party,
                 "pdf_link": pdf_link,
                 "txt_link": txt_link

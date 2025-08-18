@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from Database.models import MetaData, HighCourt
 from Database.high_court_database import SessionLocal
 import os
-
+import json
 
 # def clean_date(raw_date: str):
 #     """Parse and clean date strings like '01-01-2025 (pdf)' -> datetime.date"""
@@ -54,36 +54,33 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
             session.refresh(highcourt)
             print(f"Added new High Court: {high_court_name}")
 
-            rows: list[MetaData] = (
-                session.query(MetaData.case_id, MetaData.document_link)
-                .filter_by(high_court_id=highcourt.id)
-                .all()
-            )
-            existing_records: dict[str, list] = { row.case_id: row.document_link for row in rows}
-            
-                
-
-            
-            existing_case_ids = set(existing_records.keys())
-            print(existing_records)
+        rows: list[MetaData] = (
+            session.query(MetaData.case_id, MetaData.document_link)
+            .filter_by(high_court_id=highcourt.id)
+            .all()
+        )
+        existing_records: dict[str, list] = { row.case_id: row.document_link for row in rows}
+        print("hello")
+        existing_case_ids = set(existing_records.keys())
+        print(existing_records)
         insert_count = 0
         skip_count = 0
 
         for idx, row in df.iterrows():
             case_id = str(row['case_no']).strip() if pd.notna(row['case_no']) else None
             raw_date = str(row['date']).strip() if pd.notna(row['date']) else None
-            date_obj = datetime.strptime(raw_date, "%d-%m-%Y").date()
+            #date_obj = datetime.strptime(raw_date, "%d-%m-%Y").date()
             party_detail = str(row['party']).strip() if pd.notna(row['party']) else None
             document_link = str(row['pdf_link']).strip() if pd.notna(row['pdf_link']) else None
 
-            if not all([case_id, date_obj, party_detail, document_link]):
+            if not all([case_id, raw_date, party_detail, document_link]):
                 print(f"Row {idx} skipped: Missing fields.")
                 skip_count += 1
                 continue
             
             #judgement_date = clean_date(raw_date)
-            if not date_obj:
-                print(f" Row {idx} skipped: Invalid date '{date_obj}'.")
+            if not raw_date:
+                print(f" Row {idx} skipped: Invalid date '{raw_date}'.")
                 skip_count += 1
                 continue
 
@@ -97,14 +94,35 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
                 existing_records[case_id].append(document_link)
                 insert_count += 1
 
+            existing = session.query(MetaData).filter_by(
+                high_court_id=highcourt.id,
+                case_id=case_id
+            ).first()
+
+            if existing:
+                try:
+                    links = json.loads(existing.document_link) if existing.document_link else []
+                except Exception:
+                    links = []
+
+                if document_link not in links:
+                    links.append(document_link)
+                    existing.document_link = json.dumps(links)
+                    existing.scrapped_at = datetime.now()
+                    insert_count += 1
+                else:
+                    print(f"Row {idx} skipped: Same document_link already present in JSON.")
+                    skip_count += 1
+                continue
+
             metadata = MetaData(
                 high_court_id=highcourt.id,
                 case_id=case_id,
-                judgement_date=date_obj,
+                judgement_date=raw_date,
                 party_detail=party_detail,
                 document_link=document_link,
                 scrapped_at=datetime.now(),
-                is_downloaded=True
+                is_downloaded=False
             )
             session.add(metadata)
 

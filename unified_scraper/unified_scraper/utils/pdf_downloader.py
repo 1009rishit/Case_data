@@ -5,43 +5,60 @@ import fitz
 from datetime import datetime
 from sqlalchemy.orm import Session
 from Database.models import MetaData,HighCourt
+import json
 
 
 def sanitize_filename(name: str) -> str:
     """Remove invalid characters for filenames."""
     return re.sub(r'[\\/*?:"<>|]', '_', name)
 
+def parse_links(raw):
+    if not raw:
+        return []
+    try:
+        links = json.loads(raw)
+        if isinstance(links, str):  # JSON string, not list
+            return [links]
+        if isinstance(links, list):
+            return links
+        return []
+    except Exception:
+        # If it's not JSON, just treat it as a single link
+        return [raw.strip()]
 
 def get_pending_pdfs(session: Session, high_court_name: str):
     """
-    Retrieve all rows where is_downloaded = False from MetaData table
-    AND the high_court_id matches the high_court_name provided.
-    Returns list of dicts with document_link, case_id, and id.
+    Retrieve all rows where is_downloaded = False for a specific High Court.
+    Expands JSON document_link into multiple items (one per PDF link).
     """
-    
-    court = session.query(HighCourt).filter(
-        HighCourt.highcourt_name == high_court_name
-    ).first()
-
-    if not court:
-        return []  
+    # Get HighCourt ID
+    highcourt = session.query(HighCourt).filter_by(highcourt_name=high_court_name).first()
+    if not highcourt:
+        return []
+    print("High Court:", high_court_name, "->", highcourt)
+    print("HighCourt ID:", highcourt.id if highcourt else None) 
     pending = (
         session.query(MetaData)
         .filter(
             MetaData.is_downloaded == False,
-            MetaData.high_court_id == court.id  
+            MetaData.high_court_id == highcourt.id
         )
         .all()
-    )
+    ) 
+    print(f"hello{pending}")
 
-    return [
-        {
-            "document_link": row.document_link,
-            "case_id": row.case_id,
-            "id": row.id
-        }
-        for row in pending
-    ]
+    results = []
+    for row in pending:
+        links = parse_links(row.document_link)
+        for link in links:
+            results.append({
+                "document_link": link,
+                "case_id": row.case_id,
+                "id": row.id
+            })
+    print(results)
+    return results
+
 
 
 def pdf_to_txt(pdf_path):
