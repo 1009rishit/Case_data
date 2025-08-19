@@ -53,15 +53,17 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
         existing_records: dict[str, list] = {}
         for row in rows:
             val = row.document_link
-            if isinstance(val, str):
-                try:
-                    existing_records[row.case_id] = json.loads(val)
-                except Exception:
-                    existing_records[row.case_id] = []
-            elif isinstance(val, list):
-                existing_records[row.case_id] = val
-            else:
-                existing_records[row.case_id] = []
+            links = []
+            if val:
+                if isinstance(val, str):
+                    try:
+                        links = json.loads(val)
+                    except Exception:
+                        links = [val]
+                elif isinstance(val, list):
+                    links = val
+            existing_records[row.case_id] = links
+
         existing_case_ids = set(existing_records.keys())
         insert_count = 0
         skip_count = 0
@@ -78,21 +80,16 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
                 skip_count += 1
                 continue
             
-            #judgement_date = clean_date(raw_date)
             if not raw_date:
                 print(f" Row {idx} skipped: Invalid date '{raw_date}'.")
                 skip_count += 1
                 continue
 
-            if case_id in existing_records and document_link in existing_records[case_id]:
-                print(f"Row {idx} skipped: Duplicate case_id '{case_id}' with same document_link.")
+            csv_links = existing_records.get(case_id, [])
+            if document_link in csv_links:
+                print(f"Row {idx} skipped: Duplicate document link for case_id '{case_id}' in CSV")
                 skip_count += 1
                 continue
-
-            if case_id in existing_records:
-                print(f"Case ID '{case_id}' exists with a different document_link — inserting anyway.")
-                existing_records[case_id] = [document_link]
-                insert_count += 1
 
             existing = session.query(MetaData).filter_by(
                 high_court_id=highcourt.id,
@@ -100,38 +97,44 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
             ).first()
 
             if existing:
-                try:
-                    links = json.loads(existing.document_link) if existing.document_link else []
-                except Exception:
-                    links = []
-
+                links = []
                 if existing.document_link:
-                    if isinstance(existing.document_link, str):
+                    if isinstance(existing.document_link, list):
+                        links = existing.document_link
+                    elif isinstance(existing.document_link, str):
                         try:
                             links = json.loads(existing.document_link)
                         except Exception:
-                            links = []
-                    elif isinstance(existing.document_link, list):
-                        links = existing.document_link
-                else:
-                    print(f"Row {idx} skipped: Same document_link already present in JSON.")
+                            links = [existing.document_link]
+
+                if document_link in links:
+                    print(f"Row {idx} skipped: Duplicate document link in DB for case_id '{case_id}'")
                     skip_count += 1
-                continue
+                    continue
 
-            metadata = MetaData(
-                high_court_id=highcourt.id,
-                case_id=case_id,
-                judgement_date=raw_date,
-                party_detail=party_detail,
-                document_link=json.dumps([document_link]),
-                scrapped_at=datetime.now(),
-                is_downloaded=False
-            )
-            session.add(metadata)
+                links.append(document_link)
+                existing.document_link = json.dumps(links)
+                session.add(existing)
+                insert_count += 1
 
-            existing_records[case_id]=  document_link
-            existing_case_ids.add(case_id)
-            insert_count += 1
+            else:
+                
+                metadata = MetaData(
+                    high_court_id=highcourt.id,
+                    case_id=case_id,
+                    judgement_date=raw_date,
+                    party_detail=party_detail,
+                    document_link=json.dumps([document_link]),
+                    scrapped_at=datetime.now(),
+                    is_downloaded=False
+                )
+                session.add(metadata)
+                insert_count += 1
+
+            if case_id in existing_records:
+                existing_records[case_id].append(document_link)
+            else:
+                existing_records[case_id] = [document_link]
 
         try:
             session.commit()

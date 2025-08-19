@@ -30,8 +30,8 @@ class PHHCCaseSpider(scrapy.Spider):
     start_url = os.getenv("HARYANA_START_URL")
 
     def date_range_last_two_months(self):
-        today = datetime.datetime.today()  # Use fixed current time for reproducibility
-        two_months_ago = today - datetime.timedelta(days=60)
+        today = datetime.datetime.today() 
+        two_months_ago = today - datetime.timedelta(days=5)
         for n in range((today - two_months_ago).days):
             day = two_months_ago + datetime.timedelta(days=n)
             yield day.strftime('%d/%m/%Y')
@@ -44,7 +44,7 @@ class PHHCCaseSpider(scrapy.Spider):
         )
 
     def parse_case_types(self, response):
-        # Restore logic to use all case types
+     
         case_types = response.css('select[name="t_case_type"] option::attr(value)').getall()
         case_types = [ct for ct in case_types if ct.strip() != '']
         self.logger.info(f"Found {len(case_types)} case types: {case_types}")
