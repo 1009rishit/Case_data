@@ -9,7 +9,7 @@ import json
 
 
 
-def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: str):
+def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: str, bench_name: str, pdf_folder:str):
     """
     Insert judgment metadata from CSV into DB, avoiding duplicates based on
     (case_id, document_link, high_court_id) combination.
@@ -33,13 +33,20 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
     session: Session = SessionLocal()
     
     existing_case_ids = set()
+    
     try:
-        # Ensure High Court exists
-        highcourt = session.query(HighCourt).filter_by(highcourt_name=high_court_name).first()
+        highcourt = (
+            session.query(HighCourt)
+            .filter(
+                HighCourt.highcourt_name == high_court_name,
+                HighCourt.bench == bench_name
+            )
+            .first()
+        )
         
         existing_records: dict[str, list] = {}
         if not highcourt:
-            highcourt = HighCourt(highcourt_name=high_court_name, base_link=base_link)
+            highcourt = HighCourt(highcourt_name=high_court_name, base_link=base_link,bench=bench_name,pdf_folder=pdf_folder)
             session.add(highcourt)
             session.commit()
             session.refresh(highcourt)
@@ -145,6 +152,10 @@ def insert_judgments_from_csv(csv_path: str, high_court_name: str, base_link: st
             if os.path.exists(csv_path):
                 os.remove(csv_path)
                 print(f"Deleted CSV file: {csv_path}")
+            
+            if os.path.exists('results.xlsx'):
+                os.remove('results.xlsx')
+                print(f"excel file removed")
 
         except IntegrityError as e:
             session.rollback()

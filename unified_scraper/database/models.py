@@ -8,7 +8,7 @@ class HighCourt(Base):
     __tablename__ = "HighCourts"
 
     id = Column(Integer, primary_key=True, index=True)
-    highcourt_name = Column(String(100), unique=True, nullable=False)
+    highcourt_name = Column(String(100), nullable=False)
     base_link = Column(Text)
     bench = Column(String(255), nullable=True)       
     pdf_folder = Column(String(255), nullable=True)

@@ -12,6 +12,7 @@ from unified_scraper.utils.upload_to_azure import upload_to_azure
 from unified_scraper.utils.insert_csv_to_database import insert_judgments_from_csv
 from Database.high_court_database import SessionLocal
 from unified_scraper.spiders.link_to_pdf import SUCCESSFUL_PDFS
+from unified_scraper.utils.upload_logs_to_azure import upload_crawl_log
 
 def run_upload(downloaded_files, root_folder):
     session = SessionLocal()
@@ -44,29 +45,40 @@ def run_spider2(spider_name):
         raise
 
 def main():
-    today_str = datetime.today().strftime("%Y%m%d")
-    output_csv = f"haryana_result.csv"
-    high_court_name="Punjab&Haryana High Court"
-    run_spider("phhc_case_form_dynamic", output_csv)
-
-    print("\n Inserting records into database...")
-    insert_judgments_from_csv(
-        csv_path=output_csv,
-        high_court_name="Punjab&Haryana High Court",
-        base_link="https://www.phhc.gov.in/home.php?search_param=free_text_search_judgment"
-    )
-    print("Database insertion completed.")
-
-    print("\n downloading pdfs")
-    run_spider2("general")
+    output_csv = "haryana_result.csv"
+    high_court_name = "Punjab&Haryana High Court"
     root_folder = datetime.today().strftime("%Y")
+
+    try:
+        run_spider("phhc_case_form_dynamic", output_csv)
+
+        print("\n Inserting records into database...")
+        insert_judgments_from_csv(
+            csv_path=output_csv,
+            high_court_name=high_court_name,
+            base_link="https://www.phhc.gov.in/home.php?search_param=free_text_search_judgment",
+            bench_name=None,
+            pdf_folder="phhc"
+        )
+        print("Database insertion completed.")
+
+        print("\n Downloading PDFs")
+        run_spider2("general")
+  
+        if SUCCESSFUL_PDFS:
+            run_upload(SUCCESSFUL_PDFS, root_folder=root_folder)
+        else:
+            print("No files downloaded, skipping upload.")
+
+    except Exception as e:
+        print(f" Pipeline failed with error: {e}")
+
+    finally:
     
-    if SUCCESSFUL_PDFS:
-        print(SUCCESSFUL_PDFS)
-        run_upload(SUCCESSFUL_PDFS,root_folder=root_folder)
-    else:
-        print("No files downloaded, skipping upload.")
-        
+        try:
+            upload_crawl_log(local_log_path="crawl.log", user_choice="phhc")
+        except Exception as log_err:
+            print(f"Failed to upload crawl.log: {log_err}")
 
 
 if __name__ == "__main__":

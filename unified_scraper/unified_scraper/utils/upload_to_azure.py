@@ -42,7 +42,7 @@ def upload_to_azure(session: Session, downloaded_files,local_base):
         relative_pdf_path = os.path.relpath(pdf_path, start=local_base).replace("\\", "/")
         blob_pdf_path = f"{local_base}/{relative_pdf_path}"
 
-        print(f"📤 Uploading PDF: {blob_pdf_path}")
+        print(f" Uploading PDF: {blob_pdf_path}")
         try:
             with open(pdf_path, "rb") as data:
                 container_client.upload_blob(
@@ -88,3 +88,4 @@ def upload_to_azure(session: Session, downloaded_files,local_base):
             print(f"Deleted local folder and all contents: {local_base}")
         except Exception as e:
                 print(f"Failed to delete folder {local_base}: {e}")
+

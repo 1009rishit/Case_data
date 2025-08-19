@@ -26,13 +26,20 @@ def parse_links(raw):
         
         return [raw.strip()]
 
-def get_pending_pdfs(session: Session, high_court_name: str):
+def get_pending_pdfs(session: Session, high_court_name: str, bench_name:str):
     """
     Retrieve all rows where is_downloaded = False for a specific High Court.
     Expands JSON document_link into multiple items (one per PDF link).
     """
     # Get HighCourt ID
-    highcourt = session.query(HighCourt).filter_by(highcourt_name=high_court_name).first()
+    highcourt = (
+    session.query(HighCourt)
+    .filter(
+        HighCourt.highcourt_name == high_court_name,
+        HighCourt.bench == bench_name
+    )
+    .first()
+)
     if not highcourt:
         return []
  

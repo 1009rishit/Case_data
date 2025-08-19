@@ -34,7 +34,7 @@ class PHHCCaseSpider(scrapy.Spider):
 
         try:
             
-            pending_pdfs = get_pending_pdfs(session, high_court_name="Punjab&Haryana High Court")
+            pending_pdfs = get_pending_pdfs(session, high_court_name="Punjab&Haryana High Court",bench_name=None)
             
             start_index = int(getattr(self, 'start_index', 0))
 
