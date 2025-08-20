@@ -31,7 +31,7 @@ class PHHCCaseSpider(scrapy.Spider):
 
     def date_range_last_two_months(self):
         today = datetime.datetime.today() 
-        two_months_ago = today - datetime.timedelta(days=5)
+        two_months_ago = today - datetime.timedelta(days=60)
         for n in range((today - two_months_ago).days):
             day = two_months_ago + datetime.timedelta(days=n)
             yield day.strftime('%d/%m/%Y')

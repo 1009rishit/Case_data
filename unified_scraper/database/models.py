@@ -30,4 +30,4 @@ class MetaData(Base):
 
     highcourt = relationship("HighCourt", back_populates="judgments")
 
-    __table_args__ = (UniqueConstraint('case_id', 'high_court_id', name='_case_court_uc'),)
+ 

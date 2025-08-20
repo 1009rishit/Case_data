@@ -8,3 +8,4 @@ __pycache__/
 captcha_failed_response.html
 /alembic/
 *.ini
+/test.py/
