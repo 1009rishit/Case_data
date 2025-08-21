@@ -11,8 +11,9 @@ sys.path.insert(0, str(project_root))
 from unified_scraper.utils.upload_to_azure import upload_to_azure
 from unified_scraper.utils.insert_csv_to_database import insert_judgments_from_csv
 from Database.high_court_database import SessionLocal
-from unified_scraper.spiders.link_to_pdf import SUCCESSFUL_PDFS
+from unified_scraper.spiders.link_to_pdf import SUCCESSFUL_PDFS,PHHCCaseSpider
 from unified_scraper.utils.upload_logs_to_azure import upload_crawl_log
+from scrapy.crawler import CrawlerProcess
 
 def run_upload(downloaded_files, root_folder):
     session = SessionLocal()
@@ -33,16 +34,12 @@ def run_spider(spider_name, output_csv):
     except subprocess.CalledProcessError as e:
         print(f"Spider failed: {e}")
         raise
-def run_spider2(spider_name):
-    print("downloading the pdfs")
-    try:
-        subprocess.run(
-            ["scrapy","crawl",spider_name]
-        )
-        print(f"download successful")
-    except subprocess.CalledProcessError as e:
-        print(f"Spider failed: {e}")
-        raise
+
+def run_pdf_spider():
+    process = CrawlerProcess()
+    process.crawl(PHHCCaseSpider)  
+    process.start()  
+
 
 def main():
     output_csv = "haryana_result.csv"
@@ -61,9 +58,8 @@ def main():
             pdf_folder="phhc"
         )
         print("Database insertion completed.")
-
-        print("\n Downloading PDFs")
-        run_spider2("general")
+        
+        run_pdf_spider()
   
         if SUCCESSFUL_PDFS:
             run_upload(SUCCESSFUL_PDFS, root_folder=root_folder)

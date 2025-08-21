@@ -53,14 +53,12 @@ def upload_to_azure(session: Session, downloaded_files,local_base):
                 )
             uploaded_count += 1
 
-            # After PDF upload, mark DB record as downloaded
             session.query(MetaData).filter(MetaData.id == item["id"]).update({"is_downloaded": True})
             session.commit()
         except Exception as e:
             print(f" Failed to upload PDF {pdf_path}: {e}")
             continue
 
-        # Upload TXT if exists
         txt_path = os.path.splitext(pdf_path)[0] + ".txt"
         if os.path.exists(txt_path):
             relative_txt_path = os.path.relpath(txt_path, start=local_base).replace("\\", "/")
@@ -89,3 +87,4 @@ def upload_to_azure(session: Session, downloaded_files,local_base):
         except Exception as e:
                 print(f"Failed to delete folder {local_base}: {e}")
 
+    

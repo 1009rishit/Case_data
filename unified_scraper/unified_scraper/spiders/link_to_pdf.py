@@ -11,7 +11,9 @@ XEvil_CONFIG = {
     "interval": 5,
     "retries": 6
 }
-SUCCESSFUL_PDFS = [] 
+
+SUCCESSFUL_PDFS = []
+
 class PHHCCaseSpider(scrapy.Spider):
     name = "general"
     allowed_domains = ["phhc.gov.in"]
@@ -28,6 +30,7 @@ class PHHCCaseSpider(scrapy.Spider):
         super().__init__(*args, **kwargs)
         self.downloaded_count = 0
         self.last_success_row = -1
+        
 
     def start_requests(self):
         session = SessionLocal()
@@ -103,14 +106,15 @@ class PHHCCaseSpider(scrapy.Spider):
         content_type = post_response.headers.get("Content-Type", "")
         if content_type.startswith("application/pdf"):
             auth_token = link.split('auth=')[-1]
-            self.save_pdf_and_txt(post_response.content, auth_token, row_index)
+            file_path=self.save_pdf_and_txt(post_response.content, auth_token, row_index)
             self.downloaded_count += 1
             self.last_success_row = max(self.last_success_row, row_index)
             SUCCESSFUL_PDFS.append({
-                "document_link": link,
+                "pdf_path": file_path,
                 "case_id": case_id,
                 "id": db_id
             })
+            print(SUCCESSFUL_PDFS)
 
         else:
             debug_file = "captcha_failed_response.html"
@@ -198,6 +202,7 @@ class PHHCCaseSpider(scrapy.Spider):
 
             self.logger.info(f" Row {row_index}: PDF saved at {pdf_path}")
             self.logger.info(f" Row {row_index}: TXT saved at {txt_path}")
+            return pdf_path
 
         except Exception as e:
             self.logger.error(f"[Row {row_index}] Failed during PDF/TXT save: {e}")
