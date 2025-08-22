@@ -9,3 +9,5 @@ captcha_failed_response.html
 /alembic/
 *.ini
 /test.py/
+*.pdfs
+

@@ -1,9 +1,10 @@
 import scrapy
-from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import logging
 from unified_scraper.utils.captcha_resolver import XevilCaptchaSolver
-
+import json
+import urllib.parse
+import os
 
 class KarnatakaSpider(scrapy.Spider):
     name = "karnataka_spider"
@@ -11,14 +12,14 @@ class KarnatakaSpider(scrapy.Spider):
     start_urls = ["https://hcservices.ecourts.gov.in/hcservices/main.php"]
 
     custom_settings = {
-        "FEEDS": {"results.csv": {"format": "csv"}}
+        "FEEDS": {"results.csv": {"format": "csv"}},
+        "COOKIES_ENABLED": True,   # ✅ keep cookies alive between requests
     }
 
-    # ✅ Karnataka High Court benches (fixed)
     benches = {
         "1": "Principal Bench at Bengaluru",
         "2": "Bench at Dharwad",
-        "3": "Bench at Kalburagi"
+        "3": "Bench at Kalburagi",
     }
 
     def __init__(self, *args, **kwargs):
@@ -27,119 +28,182 @@ class KarnatakaSpider(scrapy.Spider):
         self.logger.setLevel(logging.INFO)
 
         today = datetime.today()
-        self.from_date = (today - timedelta(days=1)).strftime("%d-%m-%Y")
+        self.from_date = (today - timedelta(days=2)).strftime("%d-%m-%Y")
         self.to_date = today.strftime("%d-%m-%Y")
 
-        # Karnataka codes
-        self.state_code = "3"
-        self.court_code = "3"   # Karnataka HC main code
+        self.state_code = "3"  # fixed Karnataka HC code
 
     def parse(self, response):
-        """Step 1: Iterate only Karnataka benches directly."""
+        """Step 1: Request each bench (mimics fillHCBench call)."""
         for bench_code, bench_name in self.benches.items():
-            self.logger.info(f"🔹 Selected Bench: {bench_name} ({bench_code})")
+            payload = {
+                "action_code": "fillHCBench",
+                "state_code": self.state_code,
+                "appFlag": "web",
+            }
 
-            # Load the order date search page where captcha is shown
-            yield scrapy.Request(
+            yield scrapy.FormRequest(
                 url="https://hcservices.ecourts.gov.in/hcservices/main.php",
-                callback=self.parse_orderdate_captcha,
+                formdata=payload,
+                callback=self.parse_bench_response,
                 meta={
-                    "cookiejar": response.meta.get("cookiejar"),
+                    "cookiejar": bench_code,   # ✅ keep session per bench
                     "bench_code": bench_code,
-                    "bench_name": bench_name
-                }
+                    "bench_name": bench_name,
+                },
+                dont_filter=True,
             )
 
-    def parse_orderdate_captcha(self, response):
-        """Step 2: Fetch the captcha from Order Date search page."""
-        captcha_src = response.css("#captcha_image::attr(src)").get()
-        if not captcha_src:
-            self.logger.error(f"No captcha image for bench {response.meta['bench_name']}")
-            return
-
-        captcha_url = response.urljoin(captcha_src)
+    def parse_bench_response(self, response):
+        """Step 2: Fetch captcha."""
+        captcha_url = "https://hcservices.ecourts.gov.in/hcservices/securimage/securimage_show.php"
         yield scrapy.Request(
             captcha_url,
             callback=self.solve_captcha,
-            meta=response.meta
+            meta=response.meta,
+            dont_filter=True,
         )
 
     def solve_captcha(self, response):
-        """Step 3: Solve captcha and submit search form."""
+        """Step 3: Solve captcha and submit search form with date range."""
+        bench_name = response.meta["bench_name"]
         captcha_text = self.solver.solve(response.body)
+
         if not captcha_text:
-            self.logger.error(f"[{response.meta['bench_name']}] Captcha solving failed")
+            self.logger.error(f"[{bench_name}] Captcha solving failed")
             return
 
-        self.logger.info(f"[{response.meta['bench_name']}] ✅ Solved Captcha: {captcha_text}")
+        self.logger.info(f"[{bench_name}] ✅ Captcha: {captcha_text}")
 
         bench_code = response.meta["bench_code"]
 
         formdata = {
-            "action_code": "getCOJudgement",   # 🔑 Required for results
-            "court_code": self.court_code,
+            "court_code": bench_code,
             "state_code": self.state_code,
             "court_complex_code": bench_code,
             "caseStatusSearchType": "COorderDate",
             "from_date": self.from_date,
             "to_date": self.to_date,
             "captcha": captcha_text,
-            "appFlag": "web",
         }
 
         headers = {
-            "user-agent": "Mozilla/5.0",
-            "accept": "application/json, text/javascript, */*; q=0.01",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "origin": "https://hcservices.ecourts.gov.in",
-            "referer": "https://hcservices.ecourts.gov.in/hcservices/main.php",
-            "x-requested-with": "XMLHttpRequest",
+            "User-Agent": "Mozilla/5.0",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "X-Requested-With": "XMLHttpRequest",
+            "Origin": "https://hcservices.ecourts.gov.in",
+            "Referer": "https://hcservices.ecourts.gov.in/hcservices/main.php",
         }
 
         yield scrapy.FormRequest(
-            url="https://hcservices.ecourts.gov.in/hcservices/main.php",
+            url="https://hcservices.ecourts.gov.in/hcservices/cases_qry/index_qry.php?action_code=showRecords",
             formdata=formdata,
-            method="POST",
             headers=headers,
+            method="POST",
             callback=self.parse_results,
-            meta=response.meta
+            meta=response.meta,
+            dont_filter=True,
         )
 
-    def parse_results(self, response):
-        """Step 4: Parse the search results table."""
-        text = response.text
-        bench_name = response.meta["bench_name"]
+    def build_valid_pdf_url(self, rec, bench_code):
+        """Build valid PDF URL from record data."""
+        base = "https://hcservices.ecourts.gov.in/hcservices/cases/display_pdf.php"
 
-        if "invalid captcha" in text.lower():
-            self.logger.error(f"[{bench_name}] ❌ Invalid captcha — retry needed")
+        filename_raw = urllib.parse.unquote(rec.get("orderurlpath", ""))
+        filename_q = urllib.parse.quote(filename_raw, safe="")
+
+        type_name = rec.get("type_name")
+        reg_no = rec.get("reg_no") or rec.get("fil_no")
+        reg_year = rec.get("reg_year") or rec.get("fil_year")
+
+        if not (type_name and reg_no and reg_year):
+            return None
+
+        caseno = f"{type_name}/{int(reg_no)}/{int(reg_year)}"
+        cino = rec.get("cino")
+
+        params = [
+            ("filename", filename_q),
+            ("caseno", caseno),
+            ("cCode", bench_code),
+            ("appFlag", "web"),
+            ("normal_v", "1"),
+            ("cino", cino),
+            ("state_code", self.state_code),
+            ("flag", "nojudgement"),
+        ]
+        return f"{base}?{'&'.join([f'{k}={v}' for k, v in params if v])}"
+
+    def parse_results(self, response):
+        bench_name = response.meta["bench_name"]
+        bench_code = response.meta["bench_code"]
+
+        if "invalid captcha" in response.text.lower():
+            self.logger.error(f"[{bench_name}] ❌ Invalid captcha")
             return
 
         try:
-            if response.headers.get("Content-Type", b"").startswith(b"application/json"):
-                data = response.json()
-                rows_html = data.get("data", "")
-                soup = BeautifulSoup(rows_html, "html.parser")
-            else:
-                soup = BeautifulSoup(text, "html.parser")
+            data = json.loads(response.text)
+        except json.JSONDecodeError:
+            self.logger.error(f"[{bench_name}] ❌ Not JSON response: {response.text[:200]}")
+            return
 
-            rows = soup.select("tr")
-            for row in rows:
-                cols = row.find_all("td")
-                if len(cols) < 3:
-                    continue
+        if not data.get("con"):
+            self.logger.warning(f"[{bench_name}] ⚠️ No records found")
+            return
 
-                case_no = cols[1].get_text(strip=True)
-                order_date = cols[2].get_text(strip=True)
+        records = json.loads(data["con"][0])
 
-                link = cols[3].find("a", href=True) if len(cols) > 3 else None
-                pdf_link = response.urljoin(link["href"]) if link else None
+        for rec in records:
+            case_no = rec.get("case_no")
+            order_date = rec.get("order_dt")
 
-                yield {
-                    "bench": bench_name,
-                    "case_no": case_no,
-                    "date": order_date,
-                    "document_link": pdf_link
-                }
+            pdf_link = None
+            if rec.get("orderurlpath"):
+                pdf_link = self.build_valid_pdf_url(rec, bench_code)
 
-        except Exception as e:
-            self.logger.error(f"[{bench_name}] Failed to parse results: {e}")
+                yield scrapy.Request(
+                    url=pdf_link,
+                    callback=self.save_pdf,
+                    headers={
+                        "User-Agent": "Mozilla/5.0",
+                        "Referer": "https://hcservices.ecourts.gov.in/hcservices/main.php",
+                    },
+                    meta={
+                        "bench": bench_name,
+                        "case_no": case_no,
+                        "date": order_date,
+                        "cookiejar": response.meta["cookiejar"],  
+                    },
+                    dont_filter=True
+                )
+
+            yield {
+                "bench": bench_name,
+                "case_no": case_no,
+                "date": order_date,
+                "document_link": pdf_link,
+            }
+
+    def save_pdf(self, response):
+        """Step 5: Save PDF only if valid."""
+        case_no = response.meta["case_no"].replace("/", "_")
+        date = response.meta["date"].replace("-", "")
+        bench = response.meta["bench"].replace(" ", "_")
+
+        folder = "pdfs"
+        os.makedirs(folder, exist_ok=True)
+
+        # ✅ Check content-type
+        content_type = response.headers.get("Content-Type", b"").decode()
+        if not content_type.startswith("application/pdf"):
+            self.logger.error(
+                f"❌ Not a PDF for {case_no} (bench {bench}). Got {content_type}. Snippet: {response.text[:200]}"
+            )
+            return
+
+        filename = f"{folder}/{bench}_{case_no}_{date}.pdf"
+        with open(filename, "wb") as f:
+            f.write(response.body)
+
+        self.logger.info(f"📄 Saved PDF: {filename}")
