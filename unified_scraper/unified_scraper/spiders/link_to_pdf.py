@@ -117,10 +117,10 @@ class PHHCCaseSpider(scrapy.Spider):
             print(SUCCESSFUL_PDFS)
 
         else:
-            debug_file = "captcha_failed_response.html"
-            with open(debug_file, "w", encoding="utf-8") as f:
-                f.write(post_response.text)
-            self.logger.warning(f"[Row {row_index}] CAPTCHA failed. See '{debug_file}'")
+            # debug_file = "captcha_failed_response.html"
+            # with open(debug_file, "w", encoding="utf-8") as f:
+            #     f.write(post_response.text)
+            self.logger.warning(f"[Row {row_index}] CAPTCHA failed. ")
 
     def solve_captcha_xevil(self, captcha_bytes):
         try:

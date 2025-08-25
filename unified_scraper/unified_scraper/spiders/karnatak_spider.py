@@ -4,7 +4,7 @@ import logging
 from unified_scraper.utils.captcha_resolver import XevilCaptchaSolver
 import json
 import urllib.parse
-import os
+from scrapy.downloadermiddlewares.cookies import CookiesMiddleware
 
 class KarnatakaSpider(scrapy.Spider):
     name = "karnataka_spider"
@@ -12,8 +12,14 @@ class KarnatakaSpider(scrapy.Spider):
     start_urls = ["https://hcservices.ecourts.gov.in/hcservices/main.php"]
 
     custom_settings = {
-        "FEEDS": {"results.csv": {"format": "csv"}},
-        "COOKIES_ENABLED": True,   # ✅ keep cookies alive between requests
+        "FEEDS": {
+            "results.csv": {
+                "format": "csv",
+                "overwrite": True,   # ensures CSV is replaced, not appended
+                "fields": ["bench", "case_no", "date", "document_link"],  # enforce columns
+            }
+        },
+        "COOKIES_ENABLED": True,
     }
 
     benches = {
@@ -28,10 +34,10 @@ class KarnatakaSpider(scrapy.Spider):
         self.logger.setLevel(logging.INFO)
 
         today = datetime.today()
-        self.from_date = (today - timedelta(days=2)).strftime("%d-%m-%Y")
+        self.from_date = (today - timedelta(days=3)).strftime("%d-%m-%Y")
         self.to_date = today.strftime("%d-%m-%Y")
 
-        self.state_code = "3"  # fixed Karnataka HC code
+        self.state_code = "3"  # Karnataka state code
 
     def parse(self, response):
         """Step 1: Request each bench (mimics fillHCBench call)."""
@@ -47,7 +53,7 @@ class KarnatakaSpider(scrapy.Spider):
                 formdata=payload,
                 callback=self.parse_bench_response,
                 meta={
-                    "cookiejar": bench_code,   # ✅ keep session per bench
+                    "cookiejar": bench_code,
                     "bench_code": bench_code,
                     "bench_name": bench_name,
                 },
@@ -73,7 +79,7 @@ class KarnatakaSpider(scrapy.Spider):
             self.logger.error(f"[{bench_name}] Captcha solving failed")
             return
 
-        self.logger.info(f"[{bench_name}] ✅ Captcha: {captcha_text}")
+        self.logger.info(f"[{bench_name}] Captcha: {captcha_text}")
 
         bench_code = response.meta["bench_code"]
 
@@ -139,17 +145,17 @@ class KarnatakaSpider(scrapy.Spider):
         bench_code = response.meta["bench_code"]
 
         if "invalid captcha" in response.text.lower():
-            self.logger.error(f"[{bench_name}] ❌ Invalid captcha")
+            self.logger.error(f"[{bench_name}] Invalid captcha")
             return
 
         try:
             data = json.loads(response.text)
         except json.JSONDecodeError:
-            self.logger.error(f"[{bench_name}] ❌ Not JSON response: {response.text[:200]}")
+            self.logger.error(f"[{bench_name}] Not JSON response: {response.text[:200]}")
             return
 
         if not data.get("con"):
-            self.logger.warning(f"[{bench_name}] ⚠️ No records found")
+            self.logger.warning(f"[{bench_name}] No records found")
             return
 
         records = json.loads(data["con"][0])
@@ -162,48 +168,36 @@ class KarnatakaSpider(scrapy.Spider):
             if rec.get("orderurlpath"):
                 pdf_link = self.build_valid_pdf_url(rec, bench_code)
 
-                yield scrapy.Request(
-                    url=pdf_link,
-                    callback=self.save_pdf,
-                    headers={
-                        "User-Agent": "Mozilla/5.0",
-                        "Referer": "https://hcservices.ecourts.gov.in/hcservices/main.php",
-                    },
-                    meta={
-                        "bench": bench_name,
-                        "case_no": case_no,
-                        "date": order_date,
-                        "cookiejar": response.meta["cookiejar"],  
-                    },
-                    dont_filter=True
-                )
-
             yield {
                 "bench": bench_name,
-                "case_no": case_no,
-                "date": order_date,
-                "document_link": pdf_link,
+                "case_no": case_no or "",
+                "date": order_date or "",
+                "party":None,
+                "pdf_link": pdf_link or "",
             }
 
-    def save_pdf(self, response):
-        """Step 5: Save PDF only if valid."""
-        case_no = response.meta["case_no"].replace("/", "_")
-        date = response.meta["date"].replace("-", "")
-        bench = response.meta["bench"].replace(" ", "_")
+    def closed(self, reason):
+        """Save cookies to a file when spider finishes."""
+        cookies = {}
 
-        folder = "pdfs"
-        os.makedirs(folder, exist_ok=True)
+        # find the cookies middleware object in the stack
+        cookies_mw = None
+        for mw in self.crawler.engine.downloader.middleware.middlewares:
+            if isinstance(mw, CookiesMiddleware):
+                cookies_mw = mw
+                break
 
-        # ✅ Check content-type
-        content_type = response.headers.get("Content-Type", b"").decode()
-        if not content_type.startswith("application/pdf"):
-            self.logger.error(
-                f"❌ Not a PDF for {case_no} (bench {bench}). Got {content_type}. Snippet: {response.text[:200]}"
-            )
+        if not cookies_mw:
+            self.logger.error("❌ CookiesMiddleware not found")
             return
 
-        filename = f"{folder}/{bench}_{case_no}_{date}.pdf"
-        with open(filename, "wb") as f:
-            f.write(response.body)
+        # extract cookies per bench_code
+        for bench_code in self.benches.keys():
+            cj = cookies_mw.jars.get(str(bench_code))
+            if cj:
+                cookies[bench_code] = {c.name: c.value for c in cj}
 
-        self.logger.info(f"📄 Saved PDF: {filename}")
+        with open("cookies.json", "w") as f:
+            json.dump(cookies, f, indent=2)
+
+        self.logger.info("✅ Cookies saved to cookies.json")
