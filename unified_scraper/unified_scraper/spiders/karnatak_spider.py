@@ -34,7 +34,7 @@ class KarnatakaSpider(scrapy.Spider):
         self.logger.setLevel(logging.INFO)
 
         today = datetime.today()
-        self.from_date = (today - timedelta(days=3)).strftime("%d-%m-%Y")
+        self.from_date = (today - timedelta(days=7)).strftime("%d-%m-%Y")
         self.to_date = today.strftime("%d-%m-%Y")
 
         self.state_code = "3"  # Karnataka state code

@@ -59,7 +59,9 @@ def get_pending_pdfs(session: Session, high_court_name: str, bench_name:str):
             results.append({
                 "document_link": link,
                 "case_id": row.case_id,
-                "id": row.id
+                "id": row.id,
+                "date": row.judgement_date,
+                "bench":bench_name
             })
     return results
 

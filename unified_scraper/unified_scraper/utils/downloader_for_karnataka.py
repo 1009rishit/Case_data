@@ -39,11 +39,10 @@ def pdf_to_txt(pdf_path):
             txt_file.write(text_content)
 
     except Exception as e:
-        print(f"❌ Failed to convert {pdf_path} to TXT: {e}")
+        print(f" Failed to convert {pdf_path} to TXT: {e}")
 
 
 def download_pdfs(pdf_items, root_folder):
-    # Load cookies from spider output
     with open("cookies.json", "r") as f:
         cookies_data = json.load(f)
     today = datetime.today()
@@ -51,7 +50,7 @@ def download_pdfs(pdf_items, root_folder):
 
     downloaded_files = []
 
-    for i, item in enumerate(pdf_items, start=1):
+    for i, item in enumerate (pdf_items):
         pdf_url = item["document_link"]
         case_id = item["case_id"]
         bench = item.get("bench", "unknown").replace(" ", "_")
@@ -65,7 +64,7 @@ def download_pdfs(pdf_items, root_folder):
                 break
 
         if not bench_code or bench_code not in cookies_data:
-            print(f"[{i}] ❌ No cookies found for {bench}, skipping {case_id}")
+            print(f"[{i}]  No cookies found for {bench}, skipping {case_id}")
             continue
 
         cookies = cookies_data[bench_code]
@@ -83,7 +82,7 @@ def download_pdfs(pdf_items, root_folder):
                 with open(file_path, "wb") as f:
                     f.write(r.content)
 
-                print(f"[{i}] 📄 Saved {file_path}")
+                print(f"[{i}]  Saved {file_path}")
 
                 # Convert to TXT
                 pdf_to_txt(file_path)
@@ -96,9 +95,9 @@ def download_pdfs(pdf_items, root_folder):
                 })
 
             else:
-                print(f"[{i}] ⚠️ Failed {case_id}: {r.status_code}, {r.text[:200]}")
+                print(f"[{i}]  Failed {case_id}: {r.status_code}, {r.text[:200]}")
 
         except Exception as e:
-            print(f"[{i}] ❌ Error downloading {case_id}: {e}")
+            print(f"[{i}]  Error downloading {case_id}: {e}")
 
     return downloaded_files

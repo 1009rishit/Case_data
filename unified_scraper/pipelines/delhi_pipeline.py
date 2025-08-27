@@ -1,5 +1,5 @@
 import subprocess
-import os
+import os,logging
 from datetime import datetime
 from pathlib import Path
 import sys
@@ -13,6 +13,13 @@ from unified_scraper.utils.insert_csv_to_database import insert_judgments_from_c
 from Database.high_court_database import SessionLocal
 from unified_scraper.utils.upload_to_azure import upload_to_azure
 from unified_scraper.utils.upload_logs_to_azure import upload_crawl_log
+
+logging.basicConfig(
+    filename="crawl.log",
+    filemode="a",  # use "w" to overwrite every run
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    level=logging.INFO
+)
 
 def run_pdf_download(root_folder,high_court_name,bench_name):
     session = SessionLocal()

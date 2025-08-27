@@ -254,6 +254,7 @@ def insert_judgments_from_csv_with_benches(csv_path: str, high_court_name: str, 
                 scrapped_at=datetime.now(),
                 is_downloaded=False
             )
+            
             session.add(metadata)
             insert_count += 1
             seen_csv_pairs.add(pair)
@@ -271,6 +272,7 @@ def insert_judgments_from_csv_with_benches(csv_path: str, high_court_name: str, 
             # if os.path.exists('results.xlsx'):
             #     os.remove('results.xlsx')
             #     print(f"Excel file also removed")
+        
 
         except IntegrityError as e:
             session.rollback()

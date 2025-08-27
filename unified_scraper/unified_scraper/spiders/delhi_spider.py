@@ -28,7 +28,7 @@ class DelhiJudgmentsSpider(scrapy.Spider):
     else:
         start_urls = []
         
-    def parse(self, response):
+    def parse(self,response):
 
         token = response.css('input[name="_token"]::attr(value)').get()
         captcha = response.css('span#captcha-code::text').get()

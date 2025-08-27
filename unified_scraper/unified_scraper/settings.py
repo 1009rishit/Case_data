@@ -27,6 +27,7 @@ ITEM_PIPELINES = {
     # Add more pipelines as needed
 }
 
+
 # MIDDLEWARES (Uncomment if needed)
 # SPIDER_MIDDLEWARES = {
 #     "unified_scraper.middlewares.UnifiedSpiderMiddleware": 543,
